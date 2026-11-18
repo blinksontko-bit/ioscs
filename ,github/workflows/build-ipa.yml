@@ -1,0 +1,70 @@
+name: build-ipa
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main, master ]
+    paths-ignore:
+      - '**.md'
+
+jobs:
+  build:
+    runs-on: macos-14
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Locate project root
+        id: root
+        run: |
+          if [ -f project.yml ]; then
+            echo "dir=." >> "$GITHUB_OUTPUT"
+          elif [ -f ios-harness/project.yml ]; then
+            echo "dir=ios-harness" >> "$GITHUB_OUTPUT"
+          else
+            echo "project.yml not found"; exit 1
+          fi
+
+      - name: Install xcodegen
+        run: brew install xcodegen
+
+      - name: Generate project
+        working-directory: ${{ steps.root.outputs.dir }}
+        run: |
+          xcodegen generate
+          ls -la
+
+      - name: Build (unsigned)
+        working-directory: ${{ steps.root.outputs.dir }}
+        run: |
+          xcodebuild \
+            -project ios-harness.xcodeproj \
+            -scheme ios-harness \
+            -configuration Release \
+            -sdk iphoneos \
+            -derivedDataPath build \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            ENABLE_BITCODE=NO \
+            build
+
+      - name: Package IPA
+        working-directory: ${{ steps.root.outputs.dir }}
+        run: |
+          APP=$(find build/Build/Products/Release-iphoneos -maxdepth 1 -name '*.app' | head -1)
+          echo "APP=$APP"
+          test -n "$APP"
+          mkdir -p Payload
+          cp -R "$APP" Payload/
+          zip -qry ios-harness-unsigned.ipa Payload
+          shasum -a 256 ios-harness-unsigned.ipa | tee ios-harness-unsigned.ipa.sha256
+          ls -lh ios-harness-unsigned.ipa
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ios-harness-unsigned
+          path: |
+            ${{ steps.root.outputs.dir }}/ios-harness-unsigned.ipa
+            ${{ steps.root.outputs.dir }}/ios-harness-unsigned.ipa.sha256
+          retention-days: 30
