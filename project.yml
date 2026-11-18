@@ -1,0 +1,21 @@
+name: ios-harness
+options:
+  bundleIdPrefix: com.lab.harness
+  deploymentTarget:
+    iOS: "14.0"
+targets:
+  ios-harness:
+    type: application
+    platform: iOS
+    sources:
+      - path: Sources
+        excludes:
+          - Info.plist
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.lab.harness
+        INFOPLIST_FILE: Sources/Info.plist
+        CODE_SIGN_STYLE: Automatic
+        SWIFT_VERSION: "5.0"
+        TARGETED_DEVICE_FAMILY: "1"
+        ENABLE_BITCODE: NO
